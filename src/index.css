@@ -1,0 +1,40 @@
+/* index.css */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap');
+
+:root {
+  --primary-color: #0b5394;
+  --secondary-color: #38761d;
+  --background-dark: #0f172a;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Outfit', sans-serif;
+  background-color: var(--background-dark);
+}
+
+/* Add any custom tailwind-like utilities if needed, though we can use regular css */
+.absolute { position: absolute; }
+.inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.top-0 { top: 0; }
+.left-0 { left: 0; }
+.p-4 { padding: 1rem; }
+.pointer-events-none { pointer-events: none; }
+.flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.text-white { color: #ffffff; }
+.text-2xl { font-size: 1.5rem; line-height: 2rem; }
+.text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+.drop-shadow-md { filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.07)) drop-shadow(0 2px 2px rgb(0 0 0 / 0.06)); }
