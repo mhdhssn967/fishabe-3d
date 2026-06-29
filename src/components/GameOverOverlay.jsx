@@ -7,13 +7,14 @@ export default function GameOverOverlay({ score, restartGame }) {
     left: 0,
     width: '100%',
     height: '100%',
-    backgroundColor: '#45c4b0',
+    backgroundColor: 'rgba(69, 196, 176, 0.95)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 50,
     pointerEvents: 'auto',
+    animation: 'fadeIn 0.5s ease-out forwards',
   };
 
   const contentStyle = {
@@ -25,6 +26,7 @@ export default function GameOverOverlay({ score, restartGame }) {
     padding: '0 1.5rem',
     width: '100%',
     maxWidth: '500px',
+    animation: 'slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
   };
 
   const headerStyle = {
@@ -83,6 +85,18 @@ export default function GameOverOverlay({ score, restartGame }) {
 
   return (
     <div style={overlayStyle}>
+      <style>
+        {`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+        `}
+      </style>
       <div style={contentStyle}>
         <h2 style={headerStyle}>Game Over</h2>
         

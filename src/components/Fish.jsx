@@ -5,9 +5,10 @@ import { useGraph } from '@react-three/fiber';
 import * as THREE from 'three';
 import Particles from './Particles';
 
-export default function Fish({ lane = 0, isJumping = false, onJumpEnd, z = 0, gameOver = false, fishPositionRef, coinsCollectedCount = 0, ...props }) {
+export default function Fish({ lane = 0, isJumping = false, onJumpEnd, onLandAlmost, z = 0, gameOver = false, fishPositionRef, coinsCollectedCount = 0, ...props }) {
   const fishRef = useRef();
   const jumpTime = useRef(0);
+  const playedLandSound = useRef(false);
   const baseHeight = -0.2;
   // Load the new fish model and extract its animations
   const { scene, animations } = useGLTF('/fishanim.glb');
@@ -28,7 +29,18 @@ export default function Fish({ lane = 0, isJumping = false, onJumpEnd, z = 0, ga
   }, [actions, gameOver]);
 
   useFrame((state, delta) => {
-    if (gameOver) return;
+    if (gameOver) {
+      if (fishRef.current) {
+         // Death animation: roll upside down (PI) and sway lazily
+         const t = state.clock.elapsedTime;
+         fishRef.current.rotation.z = THREE.MathUtils.lerp(fishRef.current.rotation.z, Math.PI, 5 * delta);
+         fishRef.current.rotation.x = THREE.MathUtils.lerp(fishRef.current.rotation.x, 0, 5 * delta);
+         fishRef.current.rotation.y = THREE.MathUtils.lerp(fishRef.current.rotation.y, Math.sin(t * 3) * 0.2, 5 * delta);
+         // Float up slightly
+         fishRef.current.position.y = THREE.MathUtils.lerp(fishRef.current.position.y, baseHeight + 0.1, 2 * delta);
+      }
+      return;
+    }
 
     if (fishRef.current) {
       // Lane interpolation (x-axis)
@@ -51,6 +63,7 @@ export default function Fish({ lane = 0, isJumping = false, onJumpEnd, z = 0, ga
             const dipDepth = 0.25;
             fishRef.current.position.y = baseHeight - dipDepth * Math.sin(prepT * Math.PI);
             targetPitch = -(10 * Math.PI / 180) * Math.sin(prepT * Math.PI);
+            playedLandSound.current = false;
           } else {
             // Moon-gravity arc: pow(sin, 0.45) spends much more time near the peak
             const jumpT = (jumpTime.current - prepDuration) / jumpDuration;
@@ -60,19 +73,35 @@ export default function Fish({ lane = 0, isJumping = false, onJumpEnd, z = 0, ga
             
             // Pitch: nose up on ascent, level during float, nose down on descent
             targetPitch = (65 * Math.PI / 180) * (1 - 2 * jumpT);
+            
+            // Trigger landing sound slightly before hitting the ground
+            if (jumpT > 0.85 && !playedLandSound.current) {
+              if (onLandAlmost) onLandAlmost();
+              playedLandSound.current = true;
+            }
           }
         } else {
           // Jump finished
           fishRef.current.position.y = baseHeight;
           jumpTime.current = 0;
+          playedLandSound.current = false;
           if (onJumpEnd) onJumpEnd();
         }
       } else {
         fishRef.current.position.y = baseHeight;
       }
 
-      // Smoothly interpolate the pitch rotation
+      // Calculate horizontal movement for turning/banking
+      const diffX = targetX - fishRef.current.position.x;
+      // Turn into the direction of movement (yaw)
+      const targetYaw = -diffX * 0.8; 
+      // Lean/bank into the turn (roll)
+      const targetRoll = -diffX * 0.3;
+
+      // Smoothly interpolate the pitch, yaw, and roll rotations
       fishRef.current.rotation.x = THREE.MathUtils.lerp(fishRef.current.rotation.x, targetPitch, 15 * delta);
+      fishRef.current.rotation.y = THREE.MathUtils.lerp(fishRef.current.rotation.y, targetYaw, 15 * delta);
+      fishRef.current.rotation.z = THREE.MathUtils.lerp(fishRef.current.rotation.z, targetRoll, 15 * delta);
 
       // Update shared ref for collision detection
       if (fishPositionRef && fishPositionRef.current) {

@@ -13,11 +13,13 @@ const LANES = [-1.5, 0, 1.5]; // Left, Center, Right lanes
 // Preload the obstacle models
 useGLTF.preload('/environment/Rock.glb');
 useGLTF.preload('/environment/Chopped Log.glb');
+useGLTF.preload('/environment/Broken Fence Pillar.glb');
 
 export default function Obstacles({ speed = 6, fishPositionRef, onCollision }) {
   // Load models
   const rockGltf = useGLTF('/environment/Rock.glb');
   const logGltf = useGLTF('/environment/Chopped Log.glb');
+  const pillarGltf = useGLTF('/environment/Broken Fence Pillar.glb');
 
   // We want 4 active obstacles streaming down the river, spaced out
   const obstacleData = useMemo(() => {
@@ -25,12 +27,15 @@ export default function Obstacles({ speed = 6, fishPositionRef, onCollision }) {
     const spacing = 35; // Spaced 35 units apart in Z
 
     for (let i = 0; i < 4; i++) {
-      const type = 'rock';
+      const types = ['rock', 'pillar'];
+      const type = types[Math.floor(Math.random() * types.length)];
       const laneIdx = Math.floor(Math.random() * LANES.length);
       const z = SPAWN_Z + i * spacing;
 
       // Random scale offset
-      const scale = type === 'rock' ? 0.8 + Math.random() * 0.4 : 0.6 + Math.random() * 0.3;
+      let scale = 1.2 + Math.random() * 0.4;
+      if (type === 'rock') scale = 0.8 + Math.random() * 0.4;
+      if (type === 'pillar') scale = 1.2 
       const swayOffset = Math.random() * Math.PI * 2;
 
       data.push({
@@ -48,8 +53,10 @@ export default function Obstacles({ speed = 6, fishPositionRef, onCollision }) {
   // Pre-clone the obstacle scenes for performance
   const obstacleScenes = useMemo(() => {
     return obstacleData.map((data, i) => {
-      const isRock = data.type === 'rock';
-      const template = isRock ? rockGltf.scene : logGltf.scene;
+      let template = logGltf.scene;
+      if (data.type === 'rock') template = rockGltf.scene;
+      else if (data.type === 'pillar') template = pillarGltf.scene;
+      
       const clone = template.clone(true);
 
       clone.traverse(child => {
@@ -62,7 +69,7 @@ export default function Obstacles({ speed = 6, fishPositionRef, onCollision }) {
 
       return clone;
     });
-  }, [obstacleData, rockGltf, logGltf]);
+  }, [obstacleData, rockGltf, logGltf, pillarGltf]);
 
   useFrame((state, delta) => {
     if (speed === 0) return;
@@ -97,14 +104,20 @@ export default function Obstacles({ speed = 6, fishPositionRef, onCollision }) {
       if (data.z > RESET_Z) {
         data.z = SPAWN_Z;
         // Randomize next type and lane
-        data.type = 'rock';
+        const types = ['rock', 'pillar'];
+        data.type = types[Math.floor(Math.random() * types.length)];
         data.laneIdx = Math.floor(Math.random() * LANES.length);
-        data.scale = data.type === 'rock' ? 0.8 + Math.random() * 0.4 : 0.6 + Math.random() * 0.3;
+        
+        data.scale = 0.6 + Math.random() * 0.4;
+        if (data.type === 'rock') data.scale = 0.8 + Math.random() * 0.4;
+        if (data.type === 'pillar') data.scale = 1.2 + Math.random() * 0.5;
+        
         data.swayOffset = Math.random() * Math.PI * 2;
 
         // Update the clone's internal model geometry structure if the type swapped
-        const isRock = data.type === 'rock';
-        const newTemplate = isRock ? rockGltf.scene : logGltf.scene;
+        let newTemplate = logGltf.scene;
+        if (data.type === 'rock') newTemplate = rockGltf.scene;
+        else if (data.type === 'pillar') newTemplate = pillarGltf.scene;
         
         // Quick swap children
         obj.clear();
@@ -129,6 +142,11 @@ export default function Obstacles({ speed = 6, fishPositionRef, onCollision }) {
         obj.position.set(x, -1.4 - drop, data.z);
         obj.rotation.set(0, data.swayOffset, 0); // static random rotation
         obj.scale.setScalar(data.scale * 1.8);
+      } else if (data.type === 'pillar') {
+        // Pillar sticks straight up from riverbed
+        obj.position.set(x, -1.8 - drop, data.z);
+        obj.rotation.set(0, data.swayOffset, 0); 
+        obj.scale.setScalar(data.scale * 1.2);
       } else {
         // Log floats on water surface (Y = 0) with a sway/bob movement
         const bob = Math.sin(t * 1.5 + data.swayOffset) * 0.06;

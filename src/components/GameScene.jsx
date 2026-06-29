@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import Fish from './Fish';
 import Ground from './Ground';
 import WaterDecorations from './WaterDecorations';
+import Banners from './Banners';
 import Obstacles from './Obstacles';
 import Coins from './Coins';
 import GameOverOverlay from './GameOverOverlay';
@@ -20,10 +21,17 @@ export default function GameScene() {
   const [score, setScore] = useState(0);
   const [gameId, setGameId] = useState(0);
   const [coinsCollectedCount, setCoinsCollectedCount] = useState(0);
+  const [baseSpeed, setBaseSpeed] = useState(6);
+  const [showGameOverOverlay, setShowGameOverOverlay] = useState(false);
 
   // Audio References
   const coinAudio = useRef(new Audio('/sounds/coin.mp3'));
   const jumpAudio = useRef(new Audio('/sounds/jump.mp3'));
+  const landAudio = useRef(new Audio('/sounds/land.mp3'));
+  const sideAudio = useRef(new Audio('/sounds/side.mp3'));
+  const bgmAudio = useRef(new Audio('/sounds/xtremefreddy-game-music-loop-7-145285 (1).mp3'));
+  const sliceAudio = useRef(new Audio('/sounds/mixkit-quick-knife-slice-cutting-2152.mp3'));
+  const gameoverAudio = useRef(new Audio('/sounds/lesiakower-8-bit-game-over-sound-effect-331435.mp3'));
 
   // Shared ref for high-performance collision detection (prevents React re-renders)
   const fishPositionRef = useRef({ x: 0, y: -0.2, z: 1.5 });
@@ -45,17 +53,47 @@ export default function GameScene() {
     }
   }, [isJumping, gameOver]);
 
+  // Setup background music
+  useEffect(() => {
+    bgmAudio.current.loop = true;
+    bgmAudio.current.volume = 0.25; // Keep BGM volume moderate
+    return () => {
+      bgmAudio.current.pause();
+    };
+  }, []);
+
+  // Gradually increase speed over time up to a maximum limit
+  useEffect(() => {
+    if (gameOver) return;
+    const interval = setInterval(() => {
+      setBaseSpeed(prev => {
+        if (prev >= 12) {
+          clearInterval(interval);
+          return 18; // Cap speed at 12
+        }
+        return prev + 0.2; // Increase speed slightly every 2 seconds
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [gameOver, gameId]);
+
   const restartGame = () => {
     setScore(0);
     setLane(0);
     setIsJumping(false);
     setGameOver(false);
+    setShowGameOverOverlay(false);
+    setBaseSpeed(6);
     setCoinsCollectedCount(0);
     setGameId(prev => prev + 1);
     fishPositionRef.current = { x: 0, y: -0.2, z: 1.5 };
   };
 
   const handlePointerDown = (e) => {
+    // Start BGM on first interaction to comply with browser autoplay policies
+    if (bgmAudio.current.paused) {
+      bgmAudio.current.play().catch(() => {});
+    }
     if (gameOver) return;
     setStartX(e.clientX);
     setStartY(e.clientY);
@@ -69,8 +107,13 @@ export default function GameScene() {
 
     if (Math.abs(diffX) > Math.abs(diffY)) {
       // Horizontal swipe
-      if (diffX > 50 && lane < 1) setLane(lane + 1);
-      else if (diffX < -50 && lane > -1) setLane(lane - 1);
+      if (diffX > 50 && lane < 1) {
+        setLane(lane + 1);
+        playSound(sideAudio.current);
+      } else if (diffX < -50 && lane > -1) {
+        setLane(lane - 1);
+        playSound(sideAudio.current);
+      }
     } else {
       // Vertical swipe
       if (diffY < -50 && !isJumping) setIsJumping(true);
@@ -79,7 +122,7 @@ export default function GameScene() {
     setStartY(null);
   };
 
-  const speed = gameOver ? 0 : 6;
+  const speed = gameOver ? 0 : baseSpeed;
 
   return (
     <div 
@@ -105,7 +148,7 @@ export default function GameScene() {
         <ambientLight intensity={0.5} color="#fff4e0" />
         <hemisphereLight skyColor="#a8dfff" groundColor="#3aad5e" intensity={0.7} />
         <directionalLight 
-          position={[8, 18, 5]} 
+          position={[0, 10, 12]} 
           intensity={2.2} 
           color="#ffe680"
           castShadow 
@@ -129,6 +172,7 @@ export default function GameScene() {
             z={0} 
             lane={lane} 
             isJumping={isJumping} 
+            onLandAlmost={() => playSound(landAudio.current)}
             onJumpEnd={() => setIsJumping(false)} 
             gameOver={gameOver} 
             fishPositionRef={fishPositionRef}
@@ -136,17 +180,29 @@ export default function GameScene() {
           />
           
           {/* The straight moving ground */}
-          <Ground position={[0, 0, 0]} speed={speed} />
+          <Ground position={[0, 0, 0]} speed={speed} fishPositionRef={fishPositionRef} />
 
           {/* Lily pads, flowers & lotus on the water */}
           <WaterDecorations speed={speed} />
+          
+          {/* Randomized Banners along the banks */}
+          <Banners speed={speed} />
           
           {/* Obstacles (rocks and logs) inside the river */}
           <Obstacles 
             key={`obstacles-${gameId}`} 
             speed={speed} 
             fishPositionRef={fishPositionRef} 
-            onCollision={() => setGameOver(true)} 
+            onCollision={() => {
+              if (gameOver) return;
+              setGameOver(true);
+              bgmAudio.current.pause();
+              playSound(sliceAudio.current);
+              setTimeout(() => {
+                setShowGameOverOverlay(true);
+                playSound(gameoverAudio.current);
+              }, 2000);
+            }} 
           />
           
           {/* Collectible spinning coins */}
@@ -185,8 +241,8 @@ export default function GameScene() {
         </div>
 
         {/* Game Over Screen */}
-        {gameOver && (
-          <GameOverOverlay score={score} restartGame={restartGame} />
+        {showGameOverOverlay && (
+           <GameOverOverlay score={score} restartGame={restartGame} />
         )}
       </div>
 
